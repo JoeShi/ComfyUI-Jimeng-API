@@ -337,7 +337,16 @@ class ResultCacheStore:
             counts = entry.get("frame_counts")
             if not isinstance(images, list) or not images:
                 return False
-            if not isinstance(counts, list) or len(counts) != len(images):
+            if not isinstance(counts, list) or not counts:
+                return False
+            # frame_counts 为「每个请求的帧数」，组图（单请求多帧）时其长度
+            # 小于 images；正确不变量是帧数总和等于落盘图片数。
+            if not all(
+                isinstance(count, int) and not isinstance(count, bool) and count > 0
+                for count in counts
+            ):
+                return False
+            if sum(counts) != len(images):
                 return False
             return all(isinstance(rel, str) for rel in images)
         return False

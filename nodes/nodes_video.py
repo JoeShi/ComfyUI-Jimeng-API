@@ -963,7 +963,9 @@ class JimengVideoBase:
                 estimation_duration = est
 
             result_cache_key = None
-            if use_result_cache and not extra_api_params.get("draft"):
+            # 随机种子模式的 key 含本次运行 nonce，必然 miss 且永不命中，
+            # 跳过构建与落盘，避免产生只能等 TTL 清理的死条目。
+            if use_result_cache and not enable_random_seed and not extra_api_params.get("draft"):
                 try:
                     result_cache_key = result_cache.build_result_cache_key(
                         model_name,
@@ -973,6 +975,7 @@ class JimengVideoBase:
                         {
                             "service_tier": service_tier,
                             "return_last_frame": return_last_frame,
+                            "generation_count": generation_count,
                             "api_params": extra_api_params,
                         },
                         content,

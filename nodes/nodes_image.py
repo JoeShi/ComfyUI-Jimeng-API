@@ -186,6 +186,7 @@ def _image_result_cache_hit(cache_key):
     """
     命中结果缓存时，用缓存持有的本地结果文件重建与未命中路径等价的
     输出（IMAGE tensor + response JSON）；未命中或条目无效返回 None。
+    frame_counts 为「每个请求的帧数」，支持组图（单请求多帧）。
     """
     store = result_cache.get_result_cache_store()
     entry = store.lookup(cache_key)
@@ -193,7 +194,9 @@ def _image_result_cache_hit(cache_key):
         return None
     images = entry.get("images") or []
     frame_counts = entry.get("frame_counts") or []
-    if not images or len(frame_counts) != len(images):
+    if not images or not frame_counts:
+        return None
+    if sum(int(count or 0) for count in frame_counts) != len(images):
         return None
     tensors = []
     cursor = 0
@@ -327,13 +330,15 @@ class JimengSeedream3(comfy_io.ComfyNode):
         model_id = SEEDREAM_3_MODELS["t2i"]
 
         cache_key, cached_output = (None, None)
-        if use_result_cache:
+        # seed == -1 为随机种子：key 含本次运行 nonce，必然 miss 且永不
+        # 命中，跳过构建与落盘，避免产生只能等 TTL 清理的死条目。
+        if use_result_cache and seed != -1:
             try:
                 cache_key = result_cache.build_image_result_cache_key(
                     model_id,
                     prompt,
                     seed,
-                    seed == -1,
+                    False,
                     {
                         "size": size_param,
                         "watermark": watermark,
@@ -519,13 +524,14 @@ class JimengSeedream4(comfy_io.ComfyNode):
             size_str = size.split(" ")[0]
 
         cache_key, cached_output = (None, None)
-        if use_result_cache:
+        # seed == -1 为随机种子：必然 miss 且永不命中，跳过构建与落盘。
+        if use_result_cache and seed != -1:
             try:
                 cache_key = result_cache.build_image_result_cache_key(
                     model_id,
                     prompt,
                     seed,
-                    seed == -1,
+                    False,
                     {
                         "size": size_str,
                         "watermark": watermark,
@@ -761,7 +767,8 @@ class JimengSeedream5(comfy_io.ComfyNode):
             seq_options = SequentialImageGenerationOptions(max_images=max_images)
 
         cache_key, cached_output = (None, None)
-        if use_result_cache:
+        # seed == -1 为随机种子：必然 miss 且永不命中，跳过构建与落盘。
+        if use_result_cache and seed != -1:
             try:
                 cache_params = {
                     "size": size_str,
@@ -782,7 +789,7 @@ class JimengSeedream5(comfy_io.ComfyNode):
                     model_id,
                     prompt,
                     seed,
-                    seed == -1,
+                    False,
                     cache_params,
                     image_param,
                 )

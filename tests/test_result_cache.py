@@ -694,9 +694,38 @@ class ResultCacheStoreTests(_StoreTestCase):
         image = PIL.Image.open(path)
         self.assertEqual(image.size, (2, 2))
 
+    def test_group_image_entry_hits_and_survives_reload(self):
+        # WEI-13 打回修复：组图（单请求多帧）frame_counts=[2] + 2 张图必须可命中，
+        # 且 store 重建（模拟重启）后结构校验不再丢弃该条目。
+        arr = (numpy.arange(16, dtype=numpy.float32) / 255.0).reshape(2, 2, 4)[:, :, :3]
+        img = PIL.Image.fromarray((arr * 255.0).astype(numpy.uint8))
+        import io as _io
+
+        buffer = _io.BytesIO()
+        img.save(buffer, format="PNG")
+        blob = buffer.getvalue()
+        self.assertTrue(
+            self.store.commit_image_result(
+                "group-key", "model-img", [blob, blob], [2], json.dumps([{"id": "g"}])
+            )
+        )
+        entry = self.store.lookup("group-key")
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry["frame_counts"], [2])
+        self.assertEqual(len(entry["images"]), 2)
+
+        reloaded = result_cache.ResultCacheStore(self.cache_dir)
+        entry2 = reloaded.lookup("group-key")
+        self.assertIsNotNone(entry2, "group entry must survive store reload")
+        self.assertEqual(entry2["frame_counts"], [2])
+        self.assertEqual(len(entry2["images"]), 2)
+
     def test_image_frame_counts_mismatch_rejected(self):
+        # sum(frame_counts) 必须等于落盘图片数
         self.assertFalse(self._commit_image("ik1", "a", counts=[2]))
         self.assertIsNone(self.store.lookup("ik1"))
+        self.assertFalse(self._commit_image("ik2", "b", counts=[1, 2]))
+        self.assertIsNone(self.store.lookup("ik2"))
 
     def test_orphan_files_are_swept(self):
         self.assertTrue(self._commit_video("k1", "a"))
@@ -854,6 +883,7 @@ class VideoResultCacheIntegrationTests(unittest.TestCase):
                     {
                         "service_tier": "default",
                         "return_last_frame": True,
+                        "generation_count": 1,
                         "api_params": {
                             "resolution": "720p",
                             "ratio": "16:9",
@@ -910,15 +940,33 @@ class VideoResultCacheIntegrationTests(unittest.TestCase):
         self._run_node(content=list(content_b))
         self.assertEqual(len(self.submit_calls), 2)
 
-    def test_random_seed_mode_always_misses(self):
-        self._run_node(enable_random_seed=True)
-        self._run_node(enable_random_seed=True)
-        self.assertEqual(len(self.submit_calls), 2)
-
     def test_node_id_not_part_of_cache_key(self):
         self._run_node(node_id="1")
         self._run_node(node_id="99")
         self.assertEqual(len(self.submit_calls), 1)
+
+    def test_different_generation_count_misses(self):
+        # WEI-13 打回修复：generation_count 参与视频缓存 key，批量数变化必须 miss
+        self._run_node()
+        self.assertEqual(len(self.submit_calls), 1)
+        # 相同输入、不同批量数 → miss（输出数量不等价）
+        self._run_node(generation_count=2)
+        self.assertEqual(len(self.submit_calls), 2)
+        # 相同批量数（gc=2）第二次应命中
+        self._run_node(generation_count=2)
+        self.assertEqual(len(self.submit_calls), 2)
+        # 反向：新输入下先缓存 gc=2，再请求 gc=1 也必须 miss
+        self._run_node(prompt="a dog", generation_count=2)
+        self.assertEqual(len(self.submit_calls), 3)
+        self._run_node(prompt="a dog", generation_count=1)
+        self.assertEqual(len(self.submit_calls), 4)
+
+    def test_random_seed_mode_misses_without_dead_entries(self):
+        # WEI-13 建议：随机种子模式必然 miss，且不应产生永不命中的死条目
+        self._run_node(enable_random_seed=True)
+        self._run_node(enable_random_seed=True)
+        self.assertEqual(len(self.submit_calls), 2)
+        self.assertEqual(self.store.keys(), [])
 
     def test_toggle_off_always_submits(self):
         self._run_node(use_result_cache=False)
@@ -1000,14 +1048,15 @@ class ImageResultCacheIntegrationTests(unittest.TestCase):
     async def _fake_run_parallel_requests(self, generation_count, request_func, **kwargs):
         self.request_count.append(generation_count)
         rng = numpy.random.RandomState(7)
-        arr = (rng.rand(16, 12, 3) * 255).astype(numpy.uint8)
-        tensor = nodes_image.torch.from_numpy(arr.astype(numpy.float32) / 255.0)[None]
+        frames = getattr(self, "_fake_frame_count", 1) or 1
+        arr = (rng.rand(frames, 16, 12, 3) * 255).astype(numpy.uint8)
+        tensor = nodes_image.torch.from_numpy(arr.astype(numpy.float32) / 255.0)
         metadata = [
             {
                 "batch_index": 0,
                 "model": "doubao-seedream-4-0-250828",
                 "created": 1700000000,
-                "images": [{"index": 1, "source": "b64_json"}],
+                "images": [{"index": i + 1, "source": "b64_json"} for i in range(frames)],
             }
         ]
         return [tensor], metadata
@@ -1061,6 +1110,37 @@ class ImageResultCacheIntegrationTests(unittest.TestCase):
         self.store = result_cache.ResultCacheStore(self.cache_dir)
         self._run_node()
         self.assertEqual(len(self.request_count), 1)
+
+    def test_group_generation_hits_and_survives_reload(self):
+        # WEI-13 打回修复：组图（单请求多帧）命中重建等价多帧张量
+        self._fake_frame_count = 2
+        try:
+            out1 = self._run_node(enable_group_generation=True, max_images=2)
+            self.assertEqual(len(self.request_count), 1)
+            self.assertEqual(out1.args[0].shape[0], 2)
+
+            out2 = self._run_node(enable_group_generation=True, max_images=2)
+            self.assertEqual(len(self.request_count), 1, "group result must hit cache")
+            self.assertEqual(out2.args[0].shape[0], 2)
+            numpy.testing.assert_allclose(
+                out1.args[0].numpy(), out2.args[0].numpy(), atol=0.0
+            )
+            self.assertEqual(out1.args[1], out2.args[1])
+
+            # 模拟重启后仍命中
+            self.store = result_cache.ResultCacheStore(self.cache_dir)
+            out3 = self._run_node(enable_group_generation=True, max_images=2)
+            self.assertEqual(len(self.request_count), 1)
+            self.assertEqual(out3.args[0].shape[0], 2)
+        finally:
+            self._fake_frame_count = 1
+
+    def test_image_random_seed_skips_cache(self):
+        # seed == -1 为随机种子：必然 miss 且不落盘死条目
+        self._run_node(seed=-1)
+        self._run_node(seed=-1)
+        self.assertEqual(len(self.request_count), 2)
+        self.assertEqual(self.store.keys(), [])
 
 
 if __name__ == "__main__":
