@@ -32,6 +32,7 @@ env.bak/
 venv.bak/
 api_keys.json
 files_upload_cache.json
+result_cache/
 ARCHITECTURE.md
 /web/docs/
 V3 迁移指南.md

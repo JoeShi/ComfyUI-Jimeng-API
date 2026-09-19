@@ -142,6 +142,7 @@ class ModelConfigurationTests(unittest.TestCase):
                 "width",
                 "height",
                 "seed",
+                "use_result_cache",
                 "enable_group_generation",
                 "max_images",
                 "enable_web_search",
@@ -162,7 +163,7 @@ class ModelConfigurationTests(unittest.TestCase):
             item.id for item in nodes_image.JimengSeedream4.define_schema().inputs
         ]
         self.assertEqual(
-            seedream4_ids[1:12],
+            seedream4_ids[1:13],
             [
                 "model_version",
                 "prompt",
@@ -170,6 +171,7 @@ class ModelConfigurationTests(unittest.TestCase):
                 "width",
                 "height",
                 "seed",
+                "use_result_cache",
                 "enable_group_generation",
                 "max_images",
                 "generation_count",

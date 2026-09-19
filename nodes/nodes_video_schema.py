@@ -102,6 +102,15 @@ def get_common_video_runtime_inputs(include_offline=True):
         comfy_io.String.Input("filename_prefix", default=DEFAULT_FILENAME_PREFIX),
         comfy_io.Boolean.Input("save_last_frame_batch", default=False),
         comfy_io.Boolean.Input("non_blocking", default=False),
+        comfy_io.Boolean.Input(
+            "use_result_cache",
+            default=True,
+            tooltip=(
+                "Reuse the persisted local result when generation parameters and "
+                "reference content are identical, skipping task submission (no extra "
+                "cost). Turn off to always submit new tasks."
+            ),
+        ),
         ]
     )
     return inputs

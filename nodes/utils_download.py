@@ -240,6 +240,22 @@ async def download_image_to_temp(
     return (tensor, path)
 
 
+def image_file_to_tensor(path: str) -> torch.Tensor | None:
+    """
+    读取本地图片文件并转换为 Tensor (1, H, W, C)；失败返回 None。
+    用于从结果缓存重建输出。
+    """
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        image = PIL.Image.open(path).convert("RGB")
+        image = numpy.array(image).astype(numpy.float32) / 255.0
+        return torch.from_numpy(image)[None,]
+    except Exception as e:
+        log_msg("err_convert_tensor", e=e)
+        return None
+
+
 def save_to_output(src_path: str, filename_prefix: str):
     """
     将临时文件保存到 ComfyUI 的输出目录。

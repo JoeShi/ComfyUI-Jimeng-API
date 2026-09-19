@@ -102,6 +102,15 @@ def get_image_generation_inputs(
         comfy_io.Int.Input("width", default=default_width, min=1, max=8192),
         comfy_io.Int.Input("height", default=default_height, min=1, max=8192),
         comfy_io.Int.Input("seed", default=0, min=MIN_SEED, max=MAX_SEED),
+        comfy_io.Boolean.Input(
+            "use_result_cache",
+            default=True,
+            tooltip=(
+                "Reuse the persisted local result when generation parameters and "
+                "reference content are identical, skipping API requests (no extra "
+                "cost). Turn off to always generate new images."
+            ),
+        ),
     ]
 
     if enable_group_generation:

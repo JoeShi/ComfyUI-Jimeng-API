@@ -103,6 +103,10 @@ LOG_TRANSLATIONS = {
         "upload_ref_video_start": "开始上传参考视频（已完成: {done}，待上传: {pending}）...",
         "upload_ref_video_done": "参考视频上传完成。",
         "upload_ref_video_cache_hit": "命中参考视频缓存，复用已上传结果。",
+        "result_cache_hit": "命中结果缓存，复用本地结果，未提交新任务。",
+        "result_cache_key_failed": "构建结果缓存 key 失败，本次正常生成: {e}",
+        "result_cache_load_failed": "读取结果缓存失败，回退为正常生成: {e}",
+        "result_cache_store_failed": "写入结果缓存失败（不影响本次结果）: {e}",
         
         # 轮询提示
         "polling_single": "任务 {task_id}: 运行中... 已耗时 {elapsed}s / 预估 {max}s",
@@ -292,6 +296,10 @@ LOG_TRANSLATIONS = {
         "upload_ref_video_start": "Uploading reference video (done: {done}, pending: {pending})...",
         "upload_ref_video_done": "Reference video upload completed.",
         "upload_ref_video_cache_hit": "Reference video cache hit; reused uploaded result.",
+        "result_cache_hit": "Result cache hit; reused local result without submitting a new task.",
+        "result_cache_key_failed": "Failed to build result cache key; generating normally: {e}",
+        "result_cache_load_failed": "Failed to load result cache entry; falling back to normal generation: {e}",
+        "result_cache_store_failed": "Failed to store result cache entry (output unaffected): {e}",
         
         # Updated
         "polling_single": "Task {task_id}: Running... {elapsed}s / {max}s elapsed",

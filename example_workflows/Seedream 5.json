@@ -57,6 +57,7 @@
         {"name": "model_version.width", "type": "INT", "widget": {"name": "model_version.width"}, "link": null},
         {"name": "model_version.height", "type": "INT", "widget": {"name": "model_version.height"}, "link": null},
         {"name": "model_version.seed", "type": "INT", "widget": {"name": "model_version.seed"}, "link": null},
+        {"name": "model_version.use_result_cache", "type": "BOOLEAN", "widget": {"name": "model_version.use_result_cache"}, "link": null},
         {"name": "model_version.generation_count", "type": "INT", "widget": {"name": "model_version.generation_count"}, "link": null},
         {"name": "model_version.thinking", "type": "BOOLEAN", "widget": {"name": "model_version.thinking"}, "link": null},
         {"name": "model_version.watermark", "type": "BOOLEAN", "widget": {"name": "model_version.watermark"}, "link": null},
@@ -67,7 +68,7 @@
         {"name": "response", "type": "STRING", "links": null}
       ],
       "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengSeedream5"},
-      "widgets_values": ["doubao-seedream-5.0-pro", "", "2K (adaptive)", 2048, 2048, 0, "randomize", 1, true, false]
+      "widgets_values": ["doubao-seedream-5.0-pro", "", "2K (adaptive)", 2048, 2048, 0, "randomize", true, 1, true, false]
     },
     {
       "id": 4,
@@ -88,7 +89,7 @@
   ],
   "links": [
     [1, 1, 0, 3, 0, "JIMENG_CLIENT"],
-    [2, 2, 0, 3, 10, "IMAGE"],
+    [2, 2, 0, 3, 11, "IMAGE"],
     [3, 3, 0, 4, 0, "IMAGE"]
   ],
   "groups": [],
