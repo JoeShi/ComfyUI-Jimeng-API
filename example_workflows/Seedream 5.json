@@ -15,11 +15,12 @@
       "inputs": [
         {"name": "new_api_key", "type": "STRING", "widget": {"name": "new_api_key"}, "link": null},
         {"name": "new_key_name", "type": "STRING", "widget": {"name": "new_key_name"}, "link": null},
-        {"name": "key_name", "type": "COMBO", "widget": {"name": "key_name"}, "link": null}
+        {"name": "key_name", "type": "COMBO", "widget": {"name": "key_name"}, "link": null},
+        {"name": "auth_mode", "type": "COMBO", "widget": {"name": "auth_mode"}, "link": null}
       ],
       "outputs": [{"name": "client", "type": "JIMENG_CLIENT", "links": [1]}],
-      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.5.0", "Node name for S&R": "JimengAPIClient"},
-      "widgets_values": ["", "", "Custom"]
+      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengAPIClient"},
+      "widgets_values": ["", "", "Custom", "ark"]
     },
     {
       "id": 2,
@@ -65,7 +66,7 @@
         {"name": "images", "type": "IMAGE", "links": [3]},
         {"name": "response", "type": "STRING", "links": null}
       ],
-      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.5.0", "Node name for S&R": "JimengSeedream5"},
+      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengSeedream5"},
       "widgets_values": ["doubao-seedream-5.0-pro", "", "2K (adaptive)", 2048, 2048, 0, "randomize", 1, true, false]
     },
     {

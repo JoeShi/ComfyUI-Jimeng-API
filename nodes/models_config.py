@@ -90,3 +90,26 @@ VISUAL_MODEL_MAP = {
     "doubao-seed-2-0-mini": "doubao-seed-2-0-mini-260215",
 }
 VISUAL_UI_OPTIONS = list(VISUAL_MODEL_MAP.keys())
+
+# AgentPlan 套餐已知的视觉模型（实际可用以 Agent Plan 控制台展示为准）
+AGENTPLAN_IMAGE_MODEL_IDS = {
+    SEEDREAM_5_MODEL_MAP["doubao-seedream-5.0-pro"],
+    SEEDREAM_5_MODEL_MAP["doubao-seedream-5.0-lite"],
+}
+AGENTPLAN_VIDEO_MODEL_IDS = {
+    VIDEO_MODEL_MAP["doubao-seedance-1.5-pro"],
+    VIDEO_MODEL_MAP["doubao-seedance-2-0"],
+    VIDEO_MODEL_MAP["doubao-seedance-2-0-fast"],
+    VIDEO_MODEL_MAP["doubao-seedance-2-0-mini"],
+    VIDEO_MODEL_MAP["doubao-seedance-2-5"],
+}
+
+
+def is_agentplan_supported_visual_model(model_id) -> bool:
+    """
+    判断模型 ID 是否在 AgentPlan 套餐已知的视觉模型列表中。
+    仅用于软性提示，不阻断调用。
+    """
+    return str(model_id) in (
+        AGENTPLAN_IMAGE_MODEL_IDS | AGENTPLAN_VIDEO_MODEL_IDS
+    )

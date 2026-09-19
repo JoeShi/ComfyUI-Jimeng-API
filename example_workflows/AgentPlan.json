@@ -1,0 +1,277 @@
+{
+  "id": "b2c3d4e5-f6a7-4890-b123-c456d789e011",
+  "revision": 0,
+  "last_node_id": 3,
+  "last_link_id": 2,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "JimengAPIClient",
+      "pos": [
+        20,
+        100
+      ],
+      "size": [
+        300,
+        170
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "new_api_key",
+          "type": "STRING",
+          "widget": {
+            "name": "new_api_key"
+          },
+          "link": null
+        },
+        {
+          "name": "new_key_name",
+          "type": "STRING",
+          "widget": {
+            "name": "new_key_name"
+          },
+          "link": null
+        },
+        {
+          "name": "key_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "key_name"
+          },
+          "link": null
+        },
+        {
+          "name": "auth_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "auth_mode"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "client",
+          "type": "JIMENG_CLIENT",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "ComfyUI-Jimeng-API",
+        "ver": "2.6.0",
+        "Node name for S&R": "JimengAPIClient"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "Custom",
+        "agentplan"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "JimengSeedream5",
+      "pos": [
+        390,
+        100
+      ],
+      "size": [
+        450,
+        540
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "client",
+          "type": "JIMENG_CLIENT",
+          "link": 1
+        },
+        {
+          "name": "model_version",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "model_version"
+          },
+          "link": null
+        },
+        {
+          "name": "model_version.prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "model_version.prompt"
+          },
+          "link": null
+        },
+        {
+          "name": "model_version.size",
+          "type": "COMBO",
+          "widget": {
+            "name": "model_version.size"
+          },
+          "link": null
+        },
+        {
+          "name": "model_version.width",
+          "type": "INT",
+          "widget": {
+            "name": "model_version.width"
+          },
+          "link": null
+        },
+        {
+          "name": "model_version.height",
+          "type": "INT",
+          "widget": {
+            "name": "model_version.height"
+          },
+          "link": null
+        },
+        {
+          "name": "model_version.seed",
+          "type": "INT",
+          "widget": {
+            "name": "model_version.seed"
+          },
+          "link": null
+        },
+        {
+          "name": "model_version.generation_count",
+          "type": "INT",
+          "widget": {
+            "name": "model_version.generation_count"
+          },
+          "link": null
+        },
+        {
+          "name": "model_version.thinking",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "model_version.thinking"
+          },
+          "link": null
+        },
+        {
+          "name": "model_version.watermark",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "model_version.watermark"
+          },
+          "link": null
+        },
+        {
+          "name": "images.image_1",
+          "type": "IMAGE",
+          "shape": 7,
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "response",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "ComfyUI-Jimeng-API",
+        "ver": "2.6.0",
+        "Node name for S&R": "JimengSeedream5"
+      },
+      "widgets_values": [
+        "doubao-seedream-5.0-pro",
+        "一只戴着墨镜的橘猫，坐在海边，日落，超写实。",
+        "2K (adaptive)",
+        2048,
+        2048,
+        0,
+        "randomize",
+        1,
+        true,
+        false
+      ]
+    },
+    {
+      "id": 3,
+      "type": "SaveImage",
+      "pos": [
+        910,
+        100
+      ],
+      "size": [
+        300,
+        270
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.2",
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "Jimeng/Image/AgentPlan/Seedream5Lite"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "JIMENG_CLIENT"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        40,
+        40
+      ]
+    }
+  },
+  "version": 0.4
+}

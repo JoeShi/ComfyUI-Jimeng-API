@@ -15,11 +15,12 @@
       "inputs": [
         {"name": "new_api_key", "type": "STRING", "widget": {"name": "new_api_key"}, "link": null},
         {"name": "new_key_name", "type": "STRING", "widget": {"name": "new_key_name"}, "link": null},
-        {"name": "key_name", "type": "COMBO", "widget": {"name": "key_name"}, "link": null}
+        {"name": "key_name", "type": "COMBO", "widget": {"name": "key_name"}, "link": null},
+        {"name": "auth_mode", "type": "COMBO", "widget": {"name": "auth_mode"}, "link": null}
       ],
       "outputs": [{"name": "client", "type": "JIMENG_CLIENT", "links": [1]}],
-      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.5.0", "Node name for S&R": "JimengAPIClient"},
-      "widgets_values": ["", "", "Custom"]
+      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengAPIClient"},
+      "widgets_values": ["", "", "Custom", "ark"]
     },
     {
       "id": 2,
@@ -85,7 +86,7 @@
         {"name": "content", "type": "STRING", "links": null},
         {"name": "raw_json", "type": "STRING", "links": null}
       ],
-      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.5.0", "Node name for S&R": "JimengVisualUnderstanding"},
+      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengVisualUnderstanding"},
       "widgets_values": ["doubao-seed-2-1-pro", "你叫豆包，是由字节跳动开发的AI。", "请描述这张图片或视频的内容。", "high", 1.0, "auto", "medium", 1, false, 604800, 0, "randomize"]
     }
   ],

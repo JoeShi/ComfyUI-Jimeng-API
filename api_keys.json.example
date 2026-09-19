@@ -1,20 +1,19 @@
 [
   {
     "customName": "API Key-1",
-    "apiKey": "volc_key_goes_here"
+    "apiKey": "volc_key_goes_here",
+    "authMode": "ark"
   },
   {
-    "customName": "API Key-2",
-    "apiKey": "volc_key_goes_here"
+    "customName": "AgentPlan Key-1",
+    "apiKey": "agentplan_key_goes_here",
+    "authMode": "agentplan"
   },
   # 复制下方的代码块即可创建新的API Key存储（重命名为 api_keys.json 前需删除本行）
   {
-    "customName": "API Key-3",
-    "apiKey": "volc_key_goes_here"
-  },
-  # 复制上方的代码块即可创建新的API Key存储（重命名为 api_keys.json 前需删除本行）
-  {
     "customName": "API Key-XXX",
-    "apiKey": "volc_key_goes_here"
+    "apiKey": "volc_key_goes_here",
+    "authMode": "ark"
   }
+  # 复制上方的代码块即可创建新的API Key存储（重命名为 api_keys.json 前需删除本行）
 ]

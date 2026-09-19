@@ -14,6 +14,14 @@
       "new_key_name": {
         "name": "保存名称 (可选)",
         "tooltip": "若填写此项，API Key 将被保存到 api_keys.json 中。注意：保存后需刷新浏览器页面，新密钥才会显示在下拉列表中。"
+      },
+      "auth_mode": {
+        "name": "鉴权模式",
+        "tooltip": "选择调用方式：ark = 普通火山方舟 API（按量后付费，从此处获取 Key：https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey）；agentplan = 方舟 AgentPlan 套餐（需在 Agent Plan 控制台配置 Harness 后复制专属 API Key，使用专属 Base URL 抵扣套餐额度，请勿与普通方舟 API Key 混用）。注意：Small/Medium 套餐不支持视频生成模型；套餐支持的模型以控制台为准。",
+        "options": {
+          "ark": "火山方舟 API（按量后付费）",
+          "agentplan": "AgentPlan 套餐（专属 API Key）"
+        }
       }
     },
     "outputs": {
