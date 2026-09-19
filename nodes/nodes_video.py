@@ -61,7 +61,10 @@ from .utils_download import (
     download_video_to_temp,
     download_image_to_temp,
     save_to_output,
+    image_file_to_tensor,
 )
+
+from . import result_cache
 
 from .executor import (
     JimengGenerationExecutor,
@@ -433,6 +436,66 @@ class JimengVideoBase:
             "expire_at": now_ts + COMFY_VIDEO_UPLOAD_CACHE_TTL_SECONDS,
         }
         self._prune_comfy_video_upload_cache()
+
+    @staticmethod
+    def _extract_last_frame_tensor(video_path):
+        """从本地视频提取最后一帧为 Tensor；失败返回 None（与未命中路径的降级逻辑一致）。"""
+        if cv2 is None:
+            return None
+        cap = None
+        try:
+            cap = cv2.VideoCapture(video_path)
+            if cap.isOpened():
+                frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                if frame_count > 0:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_count - 1)
+                    ret, frame = cap.read()
+                    if ret:
+                        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                        image = frame.astype(numpy.float32) / 255.0
+                        return torch.from_numpy(image)[None,]
+            return None
+        except Exception:
+            return None
+        finally:
+            if cap is not None:
+                cap.release()
+
+    def _load_result_cache_output(
+        self, cache_key, filename_prefix, generation_count, save_last_frame_batch
+    ):
+        """
+        命中结果缓存时，用缓存持有的本地结果文件重建与未命中路径等价的
+        输出（VIDEO / last_frame / response JSON / 批量保存行为）。
+        未命中或条目无效返回 None，由调用方回退到正常生成。
+        """
+        store = result_cache.get_result_cache_store()
+        entry = store.lookup(cache_key)
+        if entry is None or entry.get("kind") != "video":
+            return None
+        first_video = None
+        first_frame = None
+        for res in entry.get("results", []):
+            video_path = store.resolve_path(res.get("video"))
+            if not video_path:
+                return None
+            frame_path = store.resolve_path(res.get("frame"))
+            if first_video is None:
+                first_video = VideoFromFile(video_path)
+            frame_tensor = None
+            if frame_path:
+                frame_tensor = image_file_to_tensor(frame_path)
+            if frame_tensor is None:
+                frame_tensor = self._extract_last_frame_tensor(video_path)
+            if first_frame is None and frame_tensor is not None:
+                first_frame = frame_tensor
+            if generation_count > 1:
+                save_to_output(video_path, filename_prefix)
+                if save_last_frame_batch and frame_path:
+                    save_to_output(frame_path, filename_prefix)
+        if first_video is None:
+            return None
+        return comfy_io.NodeOutput(first_video, first_frame, entry.get("response"))
 
     def _get_video_duration_seconds(self, video, stream_source):
         duration_fallback = None
@@ -827,9 +890,12 @@ class JimengVideoBase:
 
         # t_end = time.time()
         # print(f"[JimengAI Debug] Batch handling finished in {t_end - t_start:.2f}s")
-        
-        return comfy_io.NodeOutput(
-            first_video, first_frame, json.dumps(all_responses, indent=2)
+
+        response_json = json.dumps(all_responses, indent=2)
+        return (
+            comfy_io.NodeOutput(first_video, first_frame, response_json),
+            valid_results,
+            response_json,
         )
 
     async def _common_generation_logic(
@@ -857,10 +923,16 @@ class JimengVideoBase:
         on_tasks_created=None,
         node_class_type=None,
         workflow_prompt=None,
+        use_result_cache=True,
+        result_cache_video_hashes=None,
     ):
         """
         通用的视频生成逻辑。
         处理参数准备、任务提交、轮询和结果处理。
+
+        结果缓存：use_result_cache 开启时，「生成参数 + 参考素材内容」与
+        历史成功任务一致的请求直接复用已下载的本地结果文件，完全跳过
+        方舟任务提交；未命中则正常提交并在成功后写入缓存。
         """
         from .quota import QuotaManager
         from .constants import VIDEO_FRAME_RATE, VIDEO_RESOLUTION_PIXELS
@@ -889,7 +961,45 @@ class JimengVideoBase:
                 key, val, est = _calculate_duration_and_frames_args(duration)
                 extra_api_params[key] = val
                 estimation_duration = est
-            
+
+            result_cache_key = None
+            # 随机种子模式的 key 含本次运行 nonce，必然 miss 且永不命中，
+            # 跳过构建与落盘，避免产生只能等 TTL 清理的死条目。
+            if use_result_cache and not enable_random_seed and not extra_api_params.get("draft"):
+                try:
+                    result_cache_key = result_cache.build_result_cache_key(
+                        model_name,
+                        prompt,
+                        seed,
+                        enable_random_seed,
+                        {
+                            "service_tier": service_tier,
+                            "return_last_frame": return_last_frame,
+                            "generation_count": generation_count,
+                            "api_params": extra_api_params,
+                        },
+                        content,
+                        result_cache_video_hashes,
+                        kind="video",
+                    )
+                except Exception as e:
+                    log_msg("result_cache_key_failed", e=e)
+                    result_cache_key = None
+
+            if result_cache_key:
+                try:
+                    cached_output = self._load_result_cache_output(
+                        result_cache_key,
+                        filename_prefix,
+                        generation_count,
+                        save_last_frame_batch,
+                    )
+                    if cached_output is not None:
+                        log_msg("result_cache_hit")
+                        return cached_output
+                except Exception as e:
+                    log_msg("result_cache_load_failed", e=e)
+
             est_pixels = VIDEO_RESOLUTION_PIXELS.get(resolution, 1280 * 720)
             is_draft = extra_api_params.get("draft", False)
             has_audio = extra_api_params.get("generate_audio", False)
@@ -949,28 +1059,44 @@ class JimengVideoBase:
                  return comfy_io.NodeOutput(dummy_video, dummy_frame, json.dumps({"error": "All tasks failed but ignored. Returning dummy video/image."}))
 
             ret_results = None
+            valid_results = None
+            response_json = None
             async with aiohttp.ClientSession() as session:
-                ret_results = await self._handle_batch_success_async(
-                    successful_tasks,
-                    filename_prefix,
-                    generation_count,
-                    save_last_frame_batch,
-                    session,
+                ret_results, valid_results, response_json = (
+                    await self._handle_batch_success_async(
+                        successful_tasks,
+                        filename_prefix,
+                        generation_count,
+                        save_last_frame_batch,
+                        session,
+                    )
                 )
                 await asyncio.sleep(0.25)
-            
-            if ret_results and ret_results[2]:
+
+            if response_json:
                 try:
-                    resp_list = json.loads(ret_results[2])
+                    resp_list = json.loads(response_json)
                     total_tokens = 0
                     for item in resp_list:
                         if "usage" in item and item["usage"] and "completion_tokens" in item["usage"]:
                             total_tokens += item["usage"]["completion_tokens"]
-                    
+
                     if total_tokens > 0:
                         client.update_usage(model_name, total_tokens)
                 except Exception as e:
                     log_msg("quota_update_failed", e=e)
+
+            if result_cache_key and valid_results:
+                try:
+                    result_cache.get_result_cache_store().commit_video_result(
+                        result_cache_key,
+                        model_name,
+                        generation_count,
+                        valid_results,
+                        response_json,
+                    )
+                except Exception as e:
+                    log_msg("result_cache_store_failed", e=e)
 
             return ret_results
 
@@ -1043,6 +1169,7 @@ class JimengSeedance1(JimengVideoBase, comfy_io.ComfyNode):
         save_last_frame_batch,
         enable_offline_inference,
         non_blocking,
+        use_result_cache=True,
         image=None,
         last_frame_image=None,
     ) -> comfy_io.NodeOutput:
@@ -1109,6 +1236,7 @@ class JimengSeedance1(JimengVideoBase, comfy_io.ComfyNode):
             enable_random_seed=enable_random_seed,
             node_class_type="JimengSeedance1",
             workflow_prompt=cls.hidden.prompt,
+            use_result_cache=use_result_cache,
         )
 
 
@@ -1177,9 +1305,10 @@ class JimengSeedance1_5(JimengVideoBase, comfy_io.ComfyNode):
         save_last_frame_batch,
         enable_offline_inference,
         non_blocking,
-        draft_mode,
-        reuse_last_draft_task,
-        draft_task_id,
+        use_result_cache=True,
+        draft_mode=False,
+        reuse_last_draft_task=False,
+        draft_task_id="",
         image=None,
         last_frame_image=None,
     ) -> comfy_io.NodeOutput:
@@ -1270,11 +1399,10 @@ class JimengSeedance1_5(JimengVideoBase, comfy_io.ComfyNode):
                  dummy_frame = create_white_image_tensor(1024, 1024)
                  return comfy_io.NodeOutput(dummy_video, dummy_frame, json.dumps({"error": "All tasks failed but ignored. Returning dummy video/image."}))
 
-            ret_results = None
             async with aiohttp.ClientSession(
                 connector=aiohttp.TCPConnector(force_close=True)
             ) as session:
-                ret_results = await helper._handle_batch_success_async(
+                node_output, _, _ = await helper._handle_batch_success_async(
                     successful_tasks,
                     filename_prefix,
                     generation_count,
@@ -1282,7 +1410,7 @@ class JimengSeedance1_5(JimengVideoBase, comfy_io.ComfyNode):
                     session,
                 )
                 await asyncio.sleep(0.25)
-            return ret_results
+            return node_output
 
         content = []
         total_image_request_bytes = 0
@@ -1362,6 +1490,7 @@ class JimengSeedance1_5(JimengVideoBase, comfy_io.ComfyNode):
             on_tasks_created=_on_tasks_created,
             node_class_type="JimengSeedance1_5",
             workflow_prompt=cls.hidden.prompt,
+            use_result_cache=use_result_cache,
         )
 
         return result
@@ -1465,6 +1594,7 @@ class JimengSeedance2(JimengVideoBase, comfy_io.ComfyNode):
         filename_prefix="Jimeng/Video/Batch/Seedance",
         save_last_frame_batch=False,
         non_blocking=False,
+        use_result_cache=True,
         first_frame_image=None,
         last_frame_image=None,
         ref_images=None,
@@ -1494,6 +1624,7 @@ class JimengSeedance2(JimengVideoBase, comfy_io.ComfyNode):
                 "save_last_frame_batch", save_last_frame_batch
             )
             non_blocking = model_config.get("non_blocking", non_blocking)
+            use_result_cache = model_config.get("use_result_cache", use_result_cache)
 
         validate_seedance2_resolution(model_version, resolution)
         duration = validate_seedance2_duration(model_version, duration, auto_duration)
@@ -1558,6 +1689,15 @@ class JimengSeedance2(JimengVideoBase, comfy_io.ComfyNode):
             )
 
         uploaded_video_urls = []
+        result_cache_video_hashes = None
+        if use_result_cache and ref_videos:
+            result_cache_video_hashes = []
+            for ref_video in ref_videos:
+                video_hash = result_cache.stable_video_hash(ref_video)
+                if not video_hash:
+                    result_cache_video_hashes = None
+                    break
+                result_cache_video_hashes.append(video_hash)
         if ref_videos:
             try:
                 from comfy_api_nodes.util import upload_video_to_comfyapi
@@ -1681,6 +1821,8 @@ class JimengSeedance2(JimengVideoBase, comfy_io.ComfyNode):
             extra_api_params=extra_api_params,
             node_class_type="JimengSeedance2",
             workflow_prompt=cls.hidden.prompt,
+            use_result_cache=use_result_cache,
+            result_cache_video_hashes=result_cache_video_hashes,
         )
 
 
@@ -1739,6 +1881,7 @@ class JimengReferenceImage2Video(JimengVideoBase, comfy_io.ComfyNode):
         save_last_frame_batch,
         enable_offline_inference,
         non_blocking,
+        use_result_cache=True,
         ref_image_1=None,
         ref_image_2=None,
         ref_image_3=None,
@@ -1781,6 +1924,7 @@ class JimengReferenceImage2Video(JimengVideoBase, comfy_io.ComfyNode):
             enable_random_seed=enable_random_seed,
             node_class_type="JimengReferenceImage2Video",
             workflow_prompt=cls.hidden.prompt,
+            use_result_cache=use_result_cache,
         )
 
 

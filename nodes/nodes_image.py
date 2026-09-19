@@ -6,6 +6,7 @@ import comfy.model_management
 import json
 import time
 import re
+import io
 
 from comfy_api.latest import io as comfy_io
 
@@ -18,6 +19,7 @@ from volcenginesdkarkruntime.types.images.images import (
 from .nodes_shared import (
     GLOBAL_CATEGORY,
     _image_to_base64,
+    _tensor2images,
     get_text,
     log_msg,
     format_api_error,
@@ -27,8 +29,9 @@ from .nodes_shared import (
     create_white_image_tensor,
     safe_cat_tensors,
 )
-from .utils_download import download_url_to_image_tensor_async
+from .utils_download import download_url_to_image_tensor_async, image_file_to_tensor
 from .executor import JimengGenerationExecutor
+from . import result_cache
 
 from .models_config import (
     SEEDREAM_4_MODEL_MAP,
@@ -179,6 +182,96 @@ def _prepare_multi_image_inputs(images=None, **kwargs):
     return n_input_images, image_param
 
 
+def _image_result_cache_hit(cache_key):
+    """
+    命中结果缓存时，用缓存持有的本地结果文件重建与未命中路径等价的
+    输出（IMAGE tensor + response JSON）；未命中或条目无效返回 None。
+    frame_counts 为「每个请求的帧数」，支持组图（单请求多帧）。
+    """
+    store = result_cache.get_result_cache_store()
+    entry = store.lookup(cache_key)
+    if entry is None or entry.get("kind") != "image":
+        return None
+    images = entry.get("images") or []
+    frame_counts = entry.get("frame_counts") or []
+    if not images or not frame_counts:
+        return None
+    if sum(int(count or 0) for count in frame_counts) != len(images):
+        return None
+    tensors = []
+    cursor = 0
+    for count in frame_counts:
+        count = int(count or 0)
+        if count <= 0:
+            return None
+        frames = []
+        for rel in images[cursor : cursor + count]:
+            path = store.resolve_path(rel)
+            if not path:
+                return None
+            tensor = image_file_to_tensor(path)
+            if tensor is None:
+                return None
+            frames.append(tensor)
+        cursor += count
+        if len(frames) != count:
+            return None
+        tensors.append(frames[0] if count == 1 else torch.cat(frames, dim=0))
+    if cursor != len(images):
+        return None
+    return comfy_io.NodeOutput(safe_cat_tensors(tensors), entry.get("response"))
+
+
+def _image_frame_to_png_bytes(frame_tensor):
+    buffer = io.BytesIO()
+    _tensor2images(frame_tensor)[0].save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _commit_image_result_cache(cache_key, model_id, tensors, metadata):
+    """成功生成后将结果张量以 PNG 落盘并写入索引；失败只记日志。"""
+    blobs = []
+    frame_counts = []
+    for tensor in tensors:
+        batch_size = int(tensor.shape[0]) if tensor.ndim == 4 else 1
+        for i in range(max(batch_size, 1)):
+            frame = tensor[i : i + 1] if tensor.ndim == 4 else tensor
+            blobs.append(_image_frame_to_png_bytes(frame))
+        frame_counts.append(max(batch_size, 1))
+    response_json = json.dumps(metadata, indent=2)
+    result_cache.get_result_cache_store().commit_image_result(
+        cache_key,
+        model_id,
+        blobs,
+        frame_counts,
+        response_json,
+    )
+
+
+def _prepare_image_result_cache(cache_key):
+    """尝试命中缓存；返回 (cache_key, hit_output)。任何异常安全降级。"""
+    if not cache_key:
+        return None, None
+    try:
+        hit = _image_result_cache_hit(cache_key)
+        if hit is not None:
+            log_msg("result_cache_hit")
+            return cache_key, hit
+        return cache_key, None
+    except Exception as e:
+        log_msg("result_cache_load_failed", e=e)
+        return None, None
+
+
+def _store_image_result_cache(cache_key, model_id, tensors, metadata):
+    if not cache_key or not tensors:
+        return
+    try:
+        _commit_image_result_cache(cache_key, model_id, tensors, metadata)
+    except Exception as e:
+        log_msg("result_cache_store_failed", e=e)
+
+
 class JimengSeedream3(comfy_io.ComfyNode):
     """
     Jimeng Seedream 3 图像生成节点。
@@ -216,9 +309,10 @@ class JimengSeedream3(comfy_io.ComfyNode):
         width,
         height,
         seed,
-        generation_count,
-        watermark,
-        guidance_scale,
+        use_result_cache=True,
+        generation_count=1,
+        watermark=False,
+        guidance_scale=5.0,
     ) -> comfy_io.NodeOutput:
         node_id = cls.hidden.unique_id
         ark_client = client.ark
@@ -234,6 +328,30 @@ class JimengSeedream3(comfy_io.ComfyNode):
             size_param = size.split(" ")[0]
 
         model_id = SEEDREAM_3_MODELS["t2i"]
+
+        cache_key, cached_output = (None, None)
+        # seed == -1 为随机种子：key 含本次运行 nonce，必然 miss 且永不
+        # 命中，跳过构建与落盘，避免产生只能等 TTL 清理的死条目。
+        if use_result_cache and seed != -1:
+            try:
+                cache_key = result_cache.build_image_result_cache_key(
+                    model_id,
+                    prompt,
+                    seed,
+                    False,
+                    {
+                        "size": size_param,
+                        "watermark": watermark,
+                        "guidance_scale": guidance_scale,
+                        "generation_count": generation_count,
+                    },
+                )
+                cache_key, cached_output = _prepare_image_result_cache(cache_key)
+            except Exception as e:
+                log_msg("result_cache_key_failed", e=e)
+                cache_key = None
+            if cached_output is not None:
+                return cached_output
 
         client.check_quota(model_id, generation_count)
 
@@ -287,7 +405,9 @@ class JimengSeedream3(comfy_io.ComfyNode):
         
         executor = JimengGenerationExecutor(client, node_id, ignore_errors=ignore_errors)
         tensors, metadata = await executor.run_parallel_requests(generation_count, _generate_single)
-        
+
+        _store_image_result_cache(cache_key, model_id, tensors, metadata)
+
         if tensors:
             try:
                 count = tensors[0].shape[0] if isinstance(tensors, list) else tensors.shape[0]
@@ -356,14 +476,15 @@ class JimengSeedream4(comfy_io.ComfyNode):
         client,
         model_version,
         prompt,
-        enable_group_generation,
-        max_images,
         size,
         width,
         height,
         seed,
-        generation_count,
-        watermark,
+        use_result_cache=True,
+        enable_group_generation=False,
+        max_images=1,
+        generation_count=1,
+        watermark=False,
         thinking=True,
         images=None,
         **kwargs,
@@ -401,6 +522,32 @@ class JimengSeedream4(comfy_io.ComfyNode):
             )
         else:
             size_str = size.split(" ")[0]
+
+        cache_key, cached_output = (None, None)
+        # seed == -1 为随机种子：必然 miss 且永不命中，跳过构建与落盘。
+        if use_result_cache and seed != -1:
+            try:
+                cache_key = result_cache.build_image_result_cache_key(
+                    model_id,
+                    prompt,
+                    seed,
+                    False,
+                    {
+                        "size": size_str,
+                        "watermark": watermark,
+                        "sequential_image_generation": sequential_param,
+                        "max_images": max_images if sequential_param == "auto" else None,
+                        "thinking": thinking if model_version == "doubao-seedream-4.0" else None,
+                        "generation_count": generation_count,
+                    },
+                    image_param,
+                )
+                cache_key, cached_output = _prepare_image_result_cache(cache_key)
+            except Exception as e:
+                log_msg("result_cache_key_failed", e=e)
+                cache_key = None
+            if cached_output is not None:
+                return cached_output
 
         seq_options = None
         if sequential_param == "auto":
@@ -446,6 +593,8 @@ class JimengSeedream4(comfy_io.ComfyNode):
             )
 
         tensors, metadata = await executor.run_parallel_requests(generation_count, _generate_single)
+
+        _store_image_result_cache(cache_key, model_id, tensors, metadata)
 
         if tensors:
             try:
@@ -548,6 +697,7 @@ class JimengSeedream5(comfy_io.ComfyNode):
         width=2048,
         height=2048,
         seed=0,
+        use_result_cache=True,
         generation_count=1,
         watermark=False,
         thinking=True,
@@ -570,6 +720,7 @@ class JimengSeedream5(comfy_io.ComfyNode):
             width = model_config.get("width", width)
             height = model_config.get("height", height)
             seed = model_config.get("seed", seed)
+            use_result_cache = model_config.get("use_result_cache", use_result_cache)
             generation_count = model_config.get("generation_count", generation_count)
             watermark = model_config.get("watermark", watermark)
             thinking = model_config.get("thinking", thinking)
@@ -614,6 +765,40 @@ class JimengSeedream5(comfy_io.ComfyNode):
         seq_options = None
         if sequential_param == "auto":
             seq_options = SequentialImageGenerationOptions(max_images=max_images)
+
+        cache_key, cached_output = (None, None)
+        # seed == -1 为随机种子：必然 miss 且永不命中，跳过构建与落盘。
+        if use_result_cache and seed != -1:
+            try:
+                cache_params = {
+                    "size": size_str,
+                    "watermark": watermark,
+                    "thinking": thinking,
+                    "generation_count": generation_count,
+                    "sequential_image_generation": (
+                        sequential_param if not is_pro else None
+                    ),
+                    "max_images": (
+                        max_images if sequential_param == "auto" else None
+                    ),
+                    "enable_web_search": (
+                        enable_web_search if not is_pro else None
+                    ),
+                }
+                cache_key = result_cache.build_image_result_cache_key(
+                    model_id,
+                    prompt,
+                    seed,
+                    False,
+                    cache_params,
+                    image_param,
+                )
+                cache_key, cached_output = _prepare_image_result_cache(cache_key)
+            except Exception as e:
+                log_msg("result_cache_key_failed", e=e)
+                cache_key = None
+            if cached_output is not None:
+                return cached_output
 
         client.check_quota(
             model_id,
@@ -716,18 +901,20 @@ class JimengSeedream5(comfy_io.ComfyNode):
 
         tensors, metadata = await executor.run_parallel_requests(generation_count, _generate_single)
 
+        _store_image_result_cache(cache_key, model_id, tensors, metadata)
+
         if tensors:
             try:
                 total_imgs = sum([t.shape[0] for t in tensors]) if isinstance(tensors, list) else tensors.shape[0]
                 client.update_usage(model_id, total_imgs)
             except:
                 pass
-        
+
         if not tensors:
              return comfy_io.NodeOutput(create_white_image_tensor(), "[]")
-             
+
         output_tensor = safe_cat_tensors(tensors)
-        
+
         return comfy_io.NodeOutput(
             output_tensor, json.dumps(metadata, indent=2)
         )

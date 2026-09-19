@@ -142,6 +142,14 @@
           "link": null
         },
         {
+          "name": "model_version.use_result_cache",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "model_version.use_result_cache"
+          },
+          "link": null
+        },
+        {
           "name": "model_version.generation_count",
           "type": "INT",
           "widget": {
@@ -199,6 +207,7 @@
         2048,
         0,
         "randomize",
+        true,
         1,
         true,
         false

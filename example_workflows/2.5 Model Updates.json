@@ -38,6 +38,7 @@
         {"name": "model_version.width", "type": "INT", "widget": {"name": "model_version.width"}, "link": null},
         {"name": "model_version.height", "type": "INT", "widget": {"name": "model_version.height"}, "link": null},
         {"name": "model_version.seed", "type": "INT", "widget": {"name": "model_version.seed"}, "link": null},
+        {"name": "model_version.use_result_cache", "type": "BOOLEAN", "widget": {"name": "model_version.use_result_cache"}, "link": null},
         {"name": "model_version.generation_count", "type": "INT", "widget": {"name": "model_version.generation_count"}, "link": null},
         {"name": "model_version.thinking", "type": "BOOLEAN", "widget": {"name": "model_version.thinking"}, "link": null},
         {"name": "model_version.watermark", "type": "BOOLEAN", "widget": {"name": "model_version.watermark"}, "link": null},
@@ -48,7 +49,7 @@
         {"name": "response", "type": "STRING", "links": null}
       ],
       "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengSeedream5"},
-      "widgets_values": ["doubao-seedream-5.0-pro", "", "2K (adaptive)", 2048, 2048, 0, "randomize", 1, true, false]
+      "widgets_values": ["doubao-seedream-5.0-pro", "", "2K (adaptive)", 2048, 2048, 0, "randomize", true, 1, true, false]
     },
     {
       "id": 3,
@@ -74,6 +75,7 @@
         {"name": "model_version.filename_prefix", "type": "STRING", "widget": {"name": "model_version.filename_prefix"}, "link": null},
         {"name": "model_version.save_last_frame_batch", "type": "BOOLEAN", "widget": {"name": "model_version.save_last_frame_batch"}, "link": null},
         {"name": "model_version.non_blocking", "type": "BOOLEAN", "widget": {"name": "model_version.non_blocking"}, "link": null},
+        {"name": "model_version.use_result_cache", "type": "BOOLEAN", "widget": {"name": "model_version.use_result_cache"}, "link": null},
         {"name": "first_frame_image", "type": "IMAGE", "shape": 7, "link": null},
         {"name": "last_frame_image", "type": "IMAGE", "shape": 7, "link": null},
         {"name": "ref_images.ref_image_1", "type": "IMAGE", "shape": 7, "link": null},
@@ -86,7 +88,7 @@
         {"name": "response", "type": "STRING", "links": null}
       ],
       "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengSeedance2"},
-      "widgets_values": ["doubao-seedance-2-5", "", true, 0, "randomize", "720p", "adaptive", false, 30, true, false, 1, "Jimeng/Video/Batch/Seedance", false, false]
+      "widgets_values": ["doubao-seedance-2-5", "", true, 0, "randomize", "720p", "adaptive", false, 30, true, false, 1, "Jimeng/Video/Batch/Seedance", false, false, true]
     },
     {
       "id": 4,

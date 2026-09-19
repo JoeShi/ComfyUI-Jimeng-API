@@ -64,6 +64,7 @@
         {"name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null},
         {"name": "save_last_frame_batch", "type": "BOOLEAN", "widget": {"name": "save_last_frame_batch"}, "link": null},
         {"name": "non_blocking", "type": "BOOLEAN", "widget": {"name": "non_blocking"}, "link": null},
+        {"name": "use_result_cache", "type": "BOOLEAN", "widget": {"name": "use_result_cache"}, "link": null},
         {"name": "image", "type": "IMAGE", "shape": 7, "link": 3},
         {"name": "last_frame_image", "type": "IMAGE", "shape": 7, "link": null}
       ],
@@ -73,7 +74,7 @@
         {"name": "response", "type": "STRING", "links": null}
       ],
       "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengSeedance1"},
-      "widgets_values": ["doubao-seedance-1-0-pro", "", true, 0, "randomize", "720p", "adaptive", 5, true, false, 1, "Jimeng/Video/Batch/Seedance", false, false]
+      "widgets_values": ["doubao-seedance-1-0-pro", "", true, 0, "randomize", "720p", "adaptive", 5, true, false, 1, "Jimeng/Video/Batch/Seedance", false, false, true]
     },
     {
       "id": 4,
@@ -121,6 +122,7 @@
         {"name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null},
         {"name": "save_last_frame_batch", "type": "BOOLEAN", "widget": {"name": "save_last_frame_batch"}, "link": null},
         {"name": "non_blocking", "type": "BOOLEAN", "widget": {"name": "non_blocking"}, "link": null},
+        {"name": "use_result_cache", "type": "BOOLEAN", "widget": {"name": "use_result_cache"}, "link": null},
         {"name": "image", "type": "IMAGE", "shape": 7, "link": 4},
         {"name": "last_frame_image", "type": "IMAGE", "shape": 7, "link": null}
       ],
@@ -130,7 +132,7 @@
         {"name": "response", "type": "STRING", "links": null}
       ],
       "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengSeedance1_5"},
-      "widgets_values": ["doubao-seedance-1.5-pro", "", true, 0, "randomize", "720p", "adaptive", false, 5, true, false, false, "", true, false, 1, "Jimeng/Video/Batch/Seedance", false, false]
+      "widgets_values": ["doubao-seedance-1.5-pro", "", true, 0, "randomize", "720p", "adaptive", false, 5, true, false, false, "", true, false, 1, "Jimeng/Video/Batch/Seedance", false, false, true]
     },
     {
       "id": 6,
@@ -179,8 +181,8 @@
   "links": [
     [1, 1, 0, 3, 0, "JIMENG_CLIENT"],
     [2, 1, 0, 5, 0, "JIMENG_CLIENT"],
-    [3, 2, 0, 3, 14, "IMAGE"],
-    [4, 2, 0, 5, 19, "IMAGE"],
+    [3, 2, 0, 3, 15, "IMAGE"],
+    [4, 2, 0, 5, 20, "IMAGE"],
     [5, 3, 0, 4, 0, "VIDEO"],
     [6, 5, 0, 6, 0, "VIDEO"]
   ],

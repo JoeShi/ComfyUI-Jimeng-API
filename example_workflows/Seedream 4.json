@@ -57,6 +57,7 @@
         {"name": "width", "type": "INT", "widget": {"name": "width"}, "link": null},
         {"name": "height", "type": "INT", "widget": {"name": "height"}, "link": null},
         {"name": "seed", "type": "INT", "widget": {"name": "seed"}, "link": null},
+        {"name": "use_result_cache", "type": "BOOLEAN", "widget": {"name": "use_result_cache"}, "link": null},
         {"name": "enable_group_generation", "type": "BOOLEAN", "widget": {"name": "enable_group_generation"}, "link": null},
         {"name": "max_images", "type": "INT", "widget": {"name": "max_images"}, "link": null},
         {"name": "generation_count", "type": "INT", "widget": {"name": "generation_count"}, "link": null},
@@ -69,7 +70,7 @@
         {"name": "response", "type": "STRING", "links": null}
       ],
       "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengSeedream4"},
-      "widgets_values": ["doubao-seedream-4.0", "", "2K (adaptive)", 2048, 2048, 0, "randomize", false, 1, 1, true, false]
+      "widgets_values": ["doubao-seedream-4.0", "", "2K (adaptive)", 2048, 2048, 0, "randomize", true, false, 1, 1, true, false]
     },
     {
       "id": 4,
@@ -90,7 +91,7 @@
   ],
   "links": [
     [1, 1, 0, 3, 0, "JIMENG_CLIENT"],
-    [2, 2, 0, 3, 12, "IMAGE"],
+    [2, 2, 0, 3, 13, "IMAGE"],
     [3, 3, 0, 4, 0, "IMAGE"]
   ],
   "groups": [],
