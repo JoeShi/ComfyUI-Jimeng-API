@@ -15,11 +15,12 @@
       "inputs": [
         {"name": "new_api_key", "type": "STRING", "widget": {"name": "new_api_key"}, "link": null},
         {"name": "new_key_name", "type": "STRING", "widget": {"name": "new_key_name"}, "link": null},
-        {"name": "key_name", "type": "COMBO", "widget": {"name": "key_name"}, "link": null}
+        {"name": "key_name", "type": "COMBO", "widget": {"name": "key_name"}, "link": null},
+        {"name": "auth_mode", "type": "COMBO", "widget": {"name": "auth_mode"}, "link": null}
       ],
       "outputs": [{"name": "client", "type": "JIMENG_CLIENT", "links": [1, 2]}],
-      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.5.0", "Node name for S&R": "JimengAPIClient"},
-      "widgets_values": ["", "", "Custom"]
+      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengAPIClient"},
+      "widgets_values": ["", "", "Custom", "ark"]
     },
     {
       "id": 2,
@@ -71,7 +72,7 @@
         {"name": "last_frame", "type": "IMAGE", "links": null},
         {"name": "response", "type": "STRING", "links": null}
       ],
-      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.5.0", "Node name for S&R": "JimengSeedance1"},
+      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengSeedance1"},
       "widgets_values": ["doubao-seedance-1-0-pro", "", true, 0, "randomize", "720p", "adaptive", 5, true, false, 1, "Jimeng/Video/Batch/Seedance", false, false]
     },
     {
@@ -128,7 +129,7 @@
         {"name": "last_frame", "type": "IMAGE", "links": null},
         {"name": "response", "type": "STRING", "links": null}
       ],
-      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.5.0", "Node name for S&R": "JimengSeedance1_5"},
+      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengSeedance1_5"},
       "widgets_values": ["doubao-seedance-1.5-pro", "", true, 0, "randomize", "720p", "adaptive", false, 5, true, false, false, "", true, false, 1, "Jimeng/Video/Batch/Seedance", false, false]
     },
     {
@@ -171,7 +172,7 @@
         {"name": "task_list_json", "type": "STRING", "links": null},
         {"name": "total_tasks", "type": "INT", "links": null}
       ],
-      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.5.0", "Node name for S&R": "JimengVideoQueryTasks"},
+      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengVideoQueryTasks"},
       "widgets_values": [1, 10, "all", "default", "", "all", 0, "randomize"]
     }
   ],

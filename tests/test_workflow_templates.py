@@ -7,6 +7,7 @@ PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORKFLOW_DIR = os.path.join(PLUGIN_ROOT, "example_workflows")
 EXPECTED_WORKFLOWS = {
     "2.5 Model Updates.json",
+    "AgentPlan.json",
     "QuotaSettings.json",
     "Seedance 1.json",
     "Seedance 2.json",
@@ -23,6 +24,9 @@ def load_workflow(name):
 
 class WorkflowTemplateTests(unittest.TestCase):
     CURRENT_INPUT_ORDERS = {
+        "JimengAPIClient": [
+            "new_api_key", "new_key_name", "key_name", "auth_mode"
+        ],
         "JimengQuotaSettings": [
             "client", "image_model", "image_limit", "video_model", "video_limit"
         ],
@@ -114,7 +118,7 @@ class WorkflowTemplateTests(unittest.TestCase):
                 )
                 for node in workflow["nodes"]:
                     if node["type"].startswith("Jimeng"):
-                        self.assertEqual(node["properties"]["ver"], "2.5.0")
+                        self.assertEqual(node["properties"]["ver"], "2.6.0")
 
     def test_dynamic_combo_templates_use_v3_namespaced_inputs(self):
         for name in ("Seedance 2.json", "Seedream 5.json", "2.5 Model Updates.json"):
@@ -160,6 +164,19 @@ class WorkflowTemplateTests(unittest.TestCase):
         self.assertEqual(seedance25_node["widgets_values"][0], "doubao-seedance-2-5")
         self.assertEqual(seedance25_node["widgets_values"][5], "720p")
         self.assertEqual(seedance25_node["widgets_values"][8], 30)
+
+    def test_agentplan_template_uses_plan_mode_without_secrets(self):
+        workflow = load_workflow("AgentPlan.json")
+        client_node = next(
+            node for node in workflow["nodes"] if node["type"] == "JimengAPIClient"
+        )
+        self.assertEqual(client_node["widgets_values"][0], "")
+        self.assertEqual(client_node["widgets_values"][3], "agentplan")
+
+        seedream5 = next(
+            node for node in workflow["nodes"] if node["type"] == "JimengSeedream5"
+        )
+        self.assertEqual(seedream5["widgets_values"][0], "doubao-seedream-5.0-pro")
 
     def test_templates_do_not_embed_api_keys(self):
         for name in sorted(EXPECTED_WORKFLOWS):

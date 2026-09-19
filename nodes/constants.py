@@ -2,6 +2,12 @@
 
 # API 配置
 JIMENG_API_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
+AGENTPLAN_API_BASE_URL = "https://ark.cn-beijing.volces.com/api/plan/v3"
+
+# 鉴权模式
+AUTH_MODE_ARK = "ark"
+AUTH_MODE_AGENTPLAN = "agentplan"
+AUTH_MODE_OPTIONS = [AUTH_MODE_ARK, AUTH_MODE_AGENTPLAN]
 
 # 通用常量
 MAX_SEED = 2147483647
@@ -188,6 +194,13 @@ LOG_TRANSLATIONS = {
         "err_new_key_invalid": "输入的 API Key 无效，请检查 Key 是否正确。",
         "info_new_key_saved": "新密钥 '{name}' 已通过鉴权并保存到 api_keys.json。",
 
+        # 鉴权模式
+        "auth_mode_active": "鉴权模式: {mode} | Base URL: {base_url}",
+        "auth_mode_name_ark": "火山方舟 API（按量后付费）",
+        "auth_mode_name_agentplan": "AgentPlan 套餐（专属 API Key 抵扣 AFP）",
+        "warn_auth_mode_conflict": "密钥 '{name}' 以 {stored} 模式保存，与节点当前选择的 {selected} 不同，已按 {stored} 模式调用。",
+        "warn_agentplan_model_unsupported": "AgentPlan 模式下，模型 {model} 不在已知的套餐视觉模型列表中，调用可能失败或产生额外费用；套餐支持的模型以 Agent Plan 控制台为准。",
+
         "quota_exceeded": "模型 {model} 的使用量已达到上限 ({used}/{limit})。预计消耗: {estimated}。限制已自动解除，请重新运行或设置新的配额。",
         "quota_update_failed": "更新配额用量失败: {e}",
         "quota_set_log": "设置配额: {model} -> {limit} ({type})",
@@ -361,6 +374,13 @@ LOG_TRANSLATIONS = {
         "err_new_key_empty": "Config Error: Manual entry enabled but API Key is empty.",
         "err_new_key_invalid": "Auth Failed: Input API Key is invalid. Connection rejected by server.",
         "info_new_key_saved": "Info: New key '{name}' verified and saved to api_keys.json.",
+
+        # Auth modes
+        "auth_mode_active": "Auth mode: {mode} | Base URL: {base_url}",
+        "auth_mode_name_ark": "Volcano Ark API (pay-as-you-go)",
+        "auth_mode_name_agentplan": "AgentPlan subscription (dedicated API Key, AFP deduction)",
+        "warn_auth_mode_conflict": "Key '{name}' was saved in {stored} mode, which differs from the node selection {selected}; using {stored} mode.",
+        "warn_agentplan_model_unsupported": "Model {model} is not in the known AgentPlan visual model list; the request may fail or incur extra charges. Models supported by your plan tier are authoritative in the Agent Plan console.",
         "quota_exceeded": "Quota Exceeded: Usage limit for model {model} reached ({used}/{limit}). Estimated cost: {estimated}. Limit has been automatically removed. Please run again or set a new quota.",
         "quota_update_failed": "Warning: Failed to update quota usage: {e}",
         "quota_set_log": "Set quota for {model}: {limit} ({type})",

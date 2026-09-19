@@ -15,11 +15,12 @@
       "inputs": [
         {"name": "new_api_key", "type": "STRING", "widget": {"name": "new_api_key"}, "link": null},
         {"name": "new_key_name", "type": "STRING", "widget": {"name": "new_key_name"}, "link": null},
-        {"name": "key_name", "type": "COMBO", "widget": {"name": "key_name"}, "link": null}
+        {"name": "key_name", "type": "COMBO", "widget": {"name": "key_name"}, "link": null},
+        {"name": "auth_mode", "type": "COMBO", "widget": {"name": "auth_mode"}, "link": null}
       ],
       "outputs": [{"name": "client", "type": "JIMENG_CLIENT", "links": [1]}],
-      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.5.0", "Node name for S&R": "JimengAPIClient"},
-      "widgets_values": ["", "", "Custom"]
+      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengAPIClient"},
+      "widgets_values": ["", "", "Custom", "ark"]
     },
     {
       "id": 2,
@@ -37,7 +38,7 @@
         {"name": "video_limit", "type": "INT", "widget": {"name": "video_limit"}, "link": null}
       ],
       "outputs": [{"name": "status", "type": "STRING", "links": null}],
-      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.5.0", "Node name for S&R": "JimengQuotaSettings"},
+      "properties": {"cnr_id": "ComfyUI-Jimeng-API", "ver": "2.6.0", "Node name for S&R": "JimengQuotaSettings"},
       "widgets_values": ["None", 0, "None", 0]
     }
   ],

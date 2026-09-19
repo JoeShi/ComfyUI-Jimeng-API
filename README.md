@@ -7,6 +7,7 @@
 本项目为 [ComfyUI](https://github.com/comfyanonymous/ComfyUI) 提供了火山方舟的视觉模型（即梦/豆包） API 节点。用户可以通过这些节点在 ComfyUI 中使用多种图像生成和视频生成功能。
 
 - 项目已支持 `Seedance 2.0`、`Seedance 2.0 Fast`、`Seedance 2.0 Mini` 与 `Seedance 2.5`；2.0 标准版最高支持 4K，2.5 最长支持 30 秒。
+- 支持 [方舟 AgentPlan 套餐](https://www.volcengine.com/product/ark)（`agentplan` 鉴权模式）：使用套餐专属 API Key 与专属 Base URL 抵扣套餐额度，详见 [AgentPlan 模式](#-agentplan套餐抵扣模式)。
 - 如在使用过程中遇到问题，请通过 [ISSUES](https://github.com/fkxianzhou/ComfyUI-Jimeng-API/issues) 反馈。
 - Classic Canvas 与 Nodes 2.0（Vue）均受支持，最低支持 ComfyUI `0.25.1`。
 
@@ -69,8 +70,38 @@ git clone https://github.com/fkxianzhou/ComfyUI-Jimeng-API
 
 加载 `api_keys.json` 中的密钥配置。这是所有工作流的起点。
 
-- **输入**: `密钥名称` (在 JSON 中配置的 customName)。
+- **输入**: `密钥名称` (在 JSON 中配置的 customName)、`鉴权模式` (`ark` = 普通火山方舟 API 按量后付费；`agentplan` = 方舟 AgentPlan 套餐，使用专属 Base URL 与专属 API Key 抵扣套餐额度)。
 - **输出**: `客户端` 实例。
+- 保存为 `Custom` 输入的 Key 会连同鉴权模式一起写入 `api_keys.json`；再次选择该 Key 时将自动按保存时的模式调用，避免混用普通 Key 与 AgentPlan Key。
+
+## 🧭 AgentPlan（套餐抵扣）模式
+
+[方舟 AgentPlan](https://www.volcengine.com/activity/agentplan) 是火山引擎面向 Agent 场景的订阅套餐（按 AFP 燃料值抵扣）。本插件自 v2.6.0 起支持用 AgentPlan 套餐额度调用视觉模型。
+
+### 配置步骤
+
+1. 购买 AgentPlan 套餐（Small 档仅支持图片生成模型；视频生成需 Large 及以上档位）。
+2. 在 [Agent Plan 控制台](https://console.volcengine.com/ark/region:ark+cn-beijing/openManagement?LLM=%7B%7D&advancedActiveKey=agentPlan) 完成配置后，在 [API Key 页](https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey?apikey=%7B%7D) 复制 **AgentPlan 专属 API Key**。
+   - 注意：AgentPlan 专属 Key 与火山方舟普通 API Key **不互通**，请勿混用。
+3. 在 ComfyUI 中打开 `火山方舟 API 客户端` 节点：
+   - `鉴权模式` 选择 `agentplan`；
+   - `密钥名称` 选择 `Custom`，粘贴专属 Key（可选填写 `保存名称` 持久化到 `api_keys.json`）。
+4. 生成节点选择套餐支持的模型后运行即可。
+
+调用时控制台会打印当前鉴权模式与 Base URL（`agentplan` 对应 `https://ark.cn-beijing.volces.com/api/plan/v3`）。
+
+### 套餐支持的视觉模型（以控制台为准）
+
+- 图片生成：`doubao-seedream-5.0-pro`、`doubao-seedream-5.0-lite`
+- 视频生成：`doubao-seedance-2.5`、`doubao-seedance-2.0` / `2.0-fast` / `2.0-mini`、`doubao-seedance-1.5-pro`
+
+选择上述清单之外的模型时，控制台会输出提示（`AgentPlan 模式下，模型 ... 不在已知的套餐视觉模型列表中`），请求仍会照常发出，由服务端按套餐实际权益判定。
+
+### 注意事项
+
+- 视觉理解节点依赖 Responses API 与文件上传，其可用性取决于套餐支持情况，未纳入 AgentPlan 模式的验证范围。
+- 套餐额度（含视觉模型日额度）耗尽时请求会报错；是否允许超额后付费以控制台设置为准。
+- 示例工作流：[AgentPlan.json](./example_workflows/AgentPlan.json)（`JimengAPIClient (agentplan)` → `Seedream 5 Pro` → 保存图片）。
 
 ### `Jimeng 配额设置 (Jimeng Quota Settings)`
 

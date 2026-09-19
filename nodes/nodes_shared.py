@@ -21,7 +21,16 @@ from comfy_api.latest import io as comfy_io
 
 import logging
 
-from .constants import LOG_TRANSLATIONS, ERROR_TEXT_MATCH_RULES, JIMENG_API_BASE_URL
+from .constants import (
+    LOG_TRANSLATIONS,
+    ERROR_TEXT_MATCH_RULES,
+    JIMENG_API_BASE_URL,
+    AGENTPLAN_API_BASE_URL,
+    AUTH_MODE_ARK,
+    AUTH_MODE_AGENTPLAN,
+    AUTH_MODE_OPTIONS,
+)
+from .models_config import is_agentplan_supported_visual_model
 
 LOG_PREFIX = "[JimengAI] "
 
@@ -106,6 +115,35 @@ class LocalizationState:
 LOCALIZATION_STATE = LocalizationState(detect_system_language())
 
 
+def normalize_auth_mode(auth_mode):
+    """
+    归一化鉴权模式；未知值一律回退为普通方舟 API 模式。
+    """
+    return AUTH_MODE_AGENTPLAN if str(auth_mode) == AUTH_MODE_AGENTPLAN else AUTH_MODE_ARK
+
+
+def resolve_base_url(auth_mode):
+    """
+    根据鉴权模式返回对应的 Base URL。
+    AgentPlan 需使用专属 Base URL（包含 /plan），普通方舟 API Key 与
+    AgentPlan 专属 API Key 不互通。
+    """
+    if normalize_auth_mode(auth_mode) == AUTH_MODE_AGENTPLAN:
+        return AGENTPLAN_API_BASE_URL
+    return JIMENG_API_BASE_URL
+
+
+def auth_mode_display_name(auth_mode):
+    """
+    获取鉴权模式的本地化显示名称（去除日志前缀，避免嵌套）。
+    """
+    if normalize_auth_mode(auth_mode) == AUTH_MODE_AGENTPLAN:
+        display_name = get_text("auth_mode_name_agentplan")
+    else:
+        display_name = get_text("auth_mode_name_ark")
+    return display_name.replace(LOG_PREFIX, "")
+
+
 class ApiKeyStore:
     def __init__(self, config_file):
         self.config_file = config_file
@@ -123,7 +161,15 @@ class ApiKeyStore:
                 if isinstance(keys_data, list):
                     for item in keys_data:
                         if "customName" in item and "apiKey" in item:
-                            loaded_items.append(item)
+                            entry = dict(item)
+                            raw_mode = entry.get("authMode")
+                            # 旧版本配置无 authMode，保留 None 以便节点选择生效
+                            entry["authMode"] = (
+                                raw_mode
+                                if raw_mode in (AUTH_MODE_ARK, AUTH_MODE_AGENTPLAN)
+                                else None
+                            )
+                            loaded_items.append(entry)
         except Exception as e:
             log_msg("api_load_error", e=e)
 
@@ -141,17 +187,25 @@ class ApiKeyStore:
             return False
         return True
 
-    def upsert(self, name, key):
+    def upsert(self, name, key, auth_mode=AUTH_MODE_ARK):
+        auth_mode = normalize_auth_mode(auth_mode)
         with self._lock:
             updated = False
             for item in self._items:
                 if item["customName"] == name:
                     item["apiKey"] = key
+                    item["authMode"] = auth_mode
                     updated = True
                     break
 
             if not updated:
-                self._items.append({"customName": name, "apiKey": key})
+                self._items.append(
+                    {
+                        "customName": name,
+                        "apiKey": key,
+                        "authMode": auth_mode,
+                    }
+                )
 
         return self.save()
 
@@ -163,12 +217,15 @@ class ApiKeyStore:
         with self._lock:
             return [item["customName"] for item in self._items]
 
-    def find_api_key(self, key_name):
+    def find_entry(self, key_name):
         with self._lock:
             for item in self._items:
                 if item["customName"] == key_name:
-                    return item["apiKey"]
+                    return dict(item)
         return None
+    def find_api_key(self, key_name):
+        entry = self.find_entry(key_name)
+        return entry["apiKey"] if entry else None
 
 
 API_KEY_STORE = ApiKeyStore(API_KEYS_FILE)
@@ -320,32 +377,33 @@ def load_api_keys():
     API_KEY_STORE.load()
 
 
-def save_api_key(name, key):
+def save_api_key(name, key, auth_mode=AUTH_MODE_ARK):
     """
-    保存新的 API Key 到配置文件。
+    保存新的 API Key 到配置文件（连同鉴权模式）。
     """
-    if API_KEY_STORE.upsert(name, key):
+    if API_KEY_STORE.upsert(name, key, auth_mode=auth_mode):
         logger.info(f"Saved API Key: {name}")
 
 
-def validate_api_key(api_key: str) -> bool:
+def validate_api_key(api_key: str, base_url: str = JIMENG_API_BASE_URL) -> bool:
     """
     验证 API Key 是否有效。
+    需传入与该 Key 匹配的 Base URL（普通方舟 / AgentPlan 专属）。
     """
     try:
-        url = JIMENG_API_BASE_URL
+        url = base_url
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-        
+
         response = requests.get(url, headers=headers, timeout=10)
-        
+
         if response.status_code == 401:
             return False
-            
+
         return True
-        
+
     except Exception as e:
         logger.error(f"API Key validation error: {e}")
         return False
@@ -777,11 +835,16 @@ class JimengClients:
     """
     包装 Ark 客户端的容器类。
     """
-    def __init__(self, ark_client, api_key=None):
+    def __init__(self, ark_client, api_key=None, auth_mode=AUTH_MODE_ARK):
         self.ark = ark_client
         self.api_key = api_key
+        self.auth_mode = normalize_auth_mode(auth_mode)
+        self.base_url = resolve_base_url(self.auth_mode)
 
     def check_quota(self, model: str, estimated_cost: int):
+        if self.auth_mode == AUTH_MODE_AGENTPLAN:
+            if not is_agentplan_supported_visual_model(model):
+                log_msg("warn_agentplan_model_unsupported", model=model)
         if not self.api_key:
             return
         from .quota import QuotaManager
@@ -798,6 +861,9 @@ class JimengAPIClient(comfy_io.ComfyNode):
     """
     Jimeng API 客户端节点。
     负责加载 API 密钥并初始化 Ark 客户端。
+    支持两种鉴权模式：
+    - ark: 普通火山方舟 API（按量后付费）
+    - agentplan: 方舟 AgentPlan 套餐（专属 Base URL + 专属 API Key，抵扣套餐额度）
     """
     @classmethod
     def define_schema(cls) -> comfy_io.Schema:
@@ -813,38 +879,65 @@ class JimengAPIClient(comfy_io.ComfyNode):
                 comfy_io.String.Input("new_api_key", default=""),
                 comfy_io.String.Input("new_key_name", default=""),
                 comfy_io.Combo.Input("key_name", options=key_names),
+                comfy_io.Combo.Input(
+                    "auth_mode", options=AUTH_MODE_OPTIONS, default=AUTH_MODE_ARK
+                ),
             ],
             outputs=[JimengClientType.Output(display_name="client")],
         )
 
     @classmethod
     def execute(
-        cls, key_name, new_api_key="", new_key_name=""
+        cls, key_name, new_api_key="", new_key_name="", auth_mode=AUTH_MODE_ARK
     ) -> comfy_io.NodeOutput:
         api_key = None
+        selected_auth_mode = normalize_auth_mode(auth_mode)
 
         if key_name == "Custom":
             if not new_api_key or not new_api_key.strip():
                 raise JimengException(get_text("err_new_key_empty"))
-            
+
             api_key = new_api_key.strip()
-            
-            if not validate_api_key(api_key):
+            effective_auth_mode = selected_auth_mode
+
+            if not validate_api_key(api_key, resolve_base_url(effective_auth_mode)):
                 raise JimengException(get_text("err_new_key_invalid"))
-            
+
             if new_key_name and new_key_name.strip():
-                save_api_key(new_key_name.strip(), api_key)
+                save_api_key(new_key_name.strip(), api_key, effective_auth_mode)
                 print(get_text("info_new_key_saved", name=new_key_name.strip()))
 
         else:
-            api_key = API_KEY_STORE.find_api_key(key_name)
+            entry = API_KEY_STORE.find_entry(key_name)
+            api_key = entry["apiKey"] if entry else None
+
+            if entry and entry.get("authMode"):
+                effective_auth_mode = normalize_auth_mode(entry["authMode"])
+                if effective_auth_mode != selected_auth_mode:
+                    log_msg(
+                        "warn_auth_mode_conflict",
+                        name=key_name,
+                        stored=effective_auth_mode,
+                        selected=selected_auth_mode,
+                    )
+            else:
+                effective_auth_mode = selected_auth_mode
 
         if not api_key:
             log_msg("api_key_not_found", key_name=key_name)
             raise JimengException(get_text("popup_key_valid_err").format(key=key_name))
 
-        ark_client = Ark(
-            api_key=api_key, base_url=JIMENG_API_BASE_URL
+        base_url = resolve_base_url(effective_auth_mode)
+        log_msg(
+            "auth_mode_active",
+            mode=auth_mode_display_name(effective_auth_mode),
+            base_url=base_url,
         )
 
-        return comfy_io.NodeOutput(JimengClients(ark_client, api_key))
+        ark_client = Ark(
+            api_key=api_key, base_url=base_url
+        )
+
+        return comfy_io.NodeOutput(
+            JimengClients(ark_client, api_key, effective_auth_mode)
+        )
